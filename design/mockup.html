@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>mecha-FUI // Sidonia Grid HUD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700;800&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    border-radius: 0 !important; /* STRICT: no rounded corners */
+  }
+
+  :root {
+    --bg: #08090C;
+    --panel-bg: #000000;
+    --white: #FFFFFF;
+    --dim-white: #C5CBD6;
+    --label-gray: #9AA0AD;
+    --border-white: 1px solid #FFFFFF;
+    --border-dim: 1px solid #2B303C;
+    --blue: #3DB8FF;
+    --orange: #FF6A1A;
+    --red: #FF3B3B;
+    --green: #3DDC84;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-jp: 'Noto Sans JP', 'JetBrains Mono', sans-serif;
+  }
+
+  body {
+    width: 1920px;
+    height: 1200px;
+    overflow: hidden;
+    background-color: var(--bg);
+    color: var(--white);
+    font-family: var(--font-mono);
+    user-select: none;
+    position: relative;
+    /* Subtle background grid pattern aligning to 120px */
+    background-image: 
+      linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 120px 120px;
+  }
+
+  /* Hazard Hatching Generator (Diagonal stripes) */
+  .hazard-hatch {
+    background: repeating-linear-gradient(
+      -45deg,
+      #000000,
+      #000000 6px,
+      #FFFFFF 6px,
+      #FFFFFF 8px
+    );
+  }
+
+  .hazard-hatch-orange {
+    background: repeating-linear-gradient(
+      -45deg,
+      #000000,
+      #000000 6px,
+      var(--orange) 6px,
+      var(--orange) 8px
+    );
+  }
+
+  .hazard-hatch-subtle {
+    background: repeating-linear-gradient(
+      -45deg,
+      #000000,
+      #000000 6px,
+      rgba(255,255,255,0.25) 6px,
+      rgba(255,255,255,0.25) 7px
+    );
+  }
+
+  /* Grid Container */
+  .hud-canvas {
+    width: 1920px;
+    height: 1200px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #08090C;
+    padding: 0;
+  }
+
+  /* Panels General Rules */
+  .panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--white);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-header {
+    height: 22px;
+    border-bottom: 1px solid var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 6px;
+    background: #000;
+  }
+
+  .panel-tab {
+    background: var(--white);
+    color: #000000;
+    font-weight: 800;
+    font-size: 11px;
+    line-height: 22px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.5px;
+    font-family: var(--font-jp);
+  }
+
+  .panel-tab .kanji {
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .panel-sub-label {
+    font-size: 11px;
+    color: var(--label-gray);
+    letter-spacing: 0.5px;
+  }
+
+  .panel-content {
+    flex: 1;
+    position: relative;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* TYPOGRAPHY */
+  .type-huge {
+    font-size: 56px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -1px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .type-normal {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+
+  .type-label {
+    font-size: 11px;
+    color: var(--label-gray);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* COLOR TOKENS */
+  .text-white { color: var(--white); }
+  .text-blue { color: var(--blue); }
+  .text-orange { color: var(--orange); }
+  .text-red { color: var(--red); }
+  .text-green { color: var(--green); }
+  .text-dim { color: var(--dim-white); }
+  .text-label { color: var(--label-gray); }
+
+  /* ------------------ TOP BAR (1920 x 60) ------------------ */
+  .top-bar {
+    height: 56px;
+    border: 1px solid var(--white);
+    background: var(--panel-bg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    position: relative;
+  }
+
+  .top-workspaces {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .ws-tab {
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .ws-tab.active {
+    background: var(--white);
+    color: #000;
+  }
+
+  .top-clock-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .bracket-frame {
+    display: flex;
+    align-items: center;
+    border-left: 3px solid var(--white);
+    border-right: 3px solid var(--white);
+    padding: 2px 18px;
+    gap: 10px;
+  }
+
+  .clock-time {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: var(--white);
+  }
+
+  .clock-kanji {
+    font-size: 14px;
+    font-family: var(--font-jp);
+    font-weight: 900;
+    background: var(--white);
+    color: #000;
+    padding: 1px 4px;
+  }
+
+  .top-status-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .signal-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 16px;
+  }
+
+  .signal-bar {
+    width: 4px;
+    background: var(--white);
+  }
+
+  .segmented-battery {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    border: 1px solid var(--white);
+    padding: 2px 3px;
+    height: 20px;
+  }
+
+  .batt-cell {
+    width: 4px;
+    height: 12px;
+    background: var(--white);
+  }
+  .batt-cell.empty {
+    background: #2B303C;
+  }
+
+  .top-warning-badge {
+    background: var(--orange);
+    color: #000;
+    font-family: var(--font-jp);
+    font-weight: 900;
+    font-size: 14px;
+    padding: 4px 10px;
+    letter-spacing: 2px;
+  }
+
+  /* ------------------ MAIN 3 COLUMNS (1080 px) ------------------ */
+  .main-grid {
+    height: 1072px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .col-left {
+    width: 596px; /* 5 cells */
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .col-center {
+    width: 712px; /* 6 cells */
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .col-right {
+    width: 596px; /* 5 cells */
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ------------------ LEFT COLUMN PANELS ------------------ */
+  /* 1. Uptime Timer (5 x 1 -> ~112px) */
+  .panel-uptime {
+    height: 112px;
+  }
+  .uptime-body {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-top: 10px;
+  }
+
+  /* 2. CPU Matrix (5 x 3 -> ~340px) */
+  .panel-cpu {
+    height: 340px;
+  }
+
+  .heat-grid-16 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-gap: 4px;
+    width: 156px;
+    height: 156px;
+  }
+
+  .heat-cell {
+    border: 1px solid #333842;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: #fff;
+  }
+
+  /* Oscilloscope Waveform */
+  .osc-screen {
+    flex: 1;
+    border: 1px solid #2B303C;
+    background: #040507;
+    position: relative;
+    background-image: 
+      linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 20px 20px;
+    overflow: hidden;
+  }
+
+  /* 3. GPU Telemetry (5 x 1.5 -> ~170px) */
+  .panel-gpu {
+    height: 170px;
+  }
+
+  .arc-dials-row {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    height: 100%;
+  }
+
+  .arc-dial-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    width: 140px;
+  }
+
+  /* 4. Cooling Deck (5 x 2 -> ~220px) */
+  .panel-cooling {
+    height: 220px;
+  }
+
+  .cooling-fans {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .fan-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 120px;
+    border: 1px solid #2B303C;
+    padding: 6px 0;
+  }
+
+  /* 5. Memory & Disks (5 x 1.5 -> ~190px) */
+  .panel-storage {
+    height: 196px;
+  }
+
+  .v-bars-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    height: 128px;
+    padding: 0 10px 6px 10px;
+    border-bottom: 1px solid var(--white);
+  }
+
+  .v-bar-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+  }
+
+  .v-bar-slot {
+    width: 44px;
+    flex: 1;
+    border: 1px solid var(--white);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 2px;
+    background: #050608;
+  }
+
+  .v-bar-fill {
+    width: 100%;
+    background: var(--white);
+  }
+
+  /* ------------------ CENTER COLUMN PANELS ------------------ */
+  /* 1. Alert Header (6 x 0.5 -> 56px) */
+  .panel-alert-banner {
+    height: 56px;
+    background: var(--white);
+    color: #000000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    border: 1px solid var(--white);
+  }
+
+  .alert-text-kanji {
+    font-size: 26px;
+    font-weight: 900;
+    font-family: var(--font-jp);
+    letter-spacing: 4px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* 2. Radar Ring (6 x 3 -> ~340px) */
+  .panel-radar {
+    height: 340px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .radar-canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .radar-hud-coords {
+    position: absolute;
+    font-size: 11px;
+    color: var(--label-gray);
+    line-height: 1.4;
+  }
+  .radar-hud-coords.tl { top: 8px; left: 8px; }
+  .radar-hud-coords.tr { top: 8px; right: 8px; text-align: right; }
+  .radar-hud-coords.bl { bottom: 8px; left: 8px; }
+  .radar-hud-coords.br { bottom: 8px; right: 8px; text-align: right; }
+
+  /* 3. Target Tiles (6 x 0.5 -> ~56px) */
+  .panel-target-tiles {
+    height: 56px;
+    display: flex;
+    gap: 8px;
+    border: none;
+    background: transparent;
+  }
+
+  .target-tile {
+    flex: 1;
+    background: #000;
+    border: 1px solid var(--white);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 8px;
+  }
+
+  /* 4. Net Telemetry (6 x 1.5 -> ~170px) */
+  .panel-network {
+    height: 170px;
+  }
+
+  /* 5. System + Chassis (6 x 3.5 -> ~418px) */
+  .panel-chassis {
+    height: 418px;
+    display: flex;
+    flex-direction: row;
+  }
+
+  .chassis-half-left {
+    width: 320px;
+    border-right: 1px solid var(--white);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chassis-half-right {
+    flex: 1;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* ------------------ RIGHT COLUMN PANELS ------------------ */
+  /* 1. Media Deck (5 x 1.5 -> ~170px) */
+  .panel-media {
+    height: 170px;
+  }
+
+  .media-vis-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 36px;
+    margin: 8px 0;
+  }
+
+  .media-btn-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .fui-button {
+    flex: 1;
+    border: 1px solid var(--white);
+    background: transparent;
+    color: var(--white);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 0;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .fui-button:hover, .fui-button.active {
+    background: var(--white);
+    color: #000;
+  }
+
+  /* 2. Control Panel (5 x 2.5 -> ~276px) */
+  .panel-controls {
+    height: 276px;
+  }
+
+  .segmented-slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+  }
+
+  .slider-track-segments {
+    display: flex;
+    gap: 3px;
+    height: 14px;
+    width: 100%;
+  }
+
+  .slider-seg {
+    flex: 1;
+    background: #181B22;
+    border: 1px solid #2B303C;
+  }
+
+  .slider-seg.filled {
+    background: var(--white);
+    border-color: var(--white);
+  }
+
+  .toggle-grid-6 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .fui-toggle {
+    border: 1px solid #333842;
+    padding: 6px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #6D7584;
+    text-align: center;
+  }
+
+  .fui-toggle.on {
+    border: 1px solid var(--blue);
+    color: var(--blue);
+  }
+
+  .power-profile-strip {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .power-seg {
+    flex: 1;
+    border: 1px solid var(--white);
+    text-align: center;
+    padding: 5px 0;
+    font-size: 12px;
+    font-family: var(--font-jp);
+    font-weight: 800;
+  }
+
+  .power-seg.orange-active {
+    background: var(--orange);
+    color: #000;
+    border-color: var(--orange);
+  }
+
+  /* 3. Quick Status Tiles (5 x 1 -> ~112px) */
+  .panel-quick-status {
+    height: 112px;
+    display: flex;
+    gap: 8px;
+    border: none;
+    background: transparent;
+  }
+
+  .quick-tile {
+    flex: 1;
+    background: #000;
+    border: 1px solid var(--white);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 6px 8px;
+  }
+
+  /* 4. Workspace Map (5 x 1 -> ~112px) */
+  .panel-ws-map {
+    height: 112px;
+  }
+
+  .ws-map-container {
+    display: flex;
+    gap: 8px;
+    height: 100%;
+  }
+
+  .ws-mini-screen {
+    flex: 1;
+    border: 1px solid #333842;
+    background: #050608;
+    position: relative;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ws-mini-screen.active {
+    border: 1px solid var(--blue);
+  }
+
+  .mini-window {
+    position: absolute;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.4);
+  }
+
+  .mini-window.active {
+    border-color: var(--blue);
+    background: rgba(61, 184, 255, 0.2);
+  }
+
+  /* 5. Notification Feed (5 x 3 -> ~340px) */
+  .panel-notifications {
+    height: 352px;
+  }
+
+  .noti-row {
+    border: 1px solid #2B303C;
+    padding: 6px 8px;
+    margin-bottom: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .noti-row.border-orange {
+    border: 1px solid var(--orange);
+  }
+
+  .noti-row.border-red {
+    border: 1px solid var(--red);
+  }
+
+  /* ------------------ FOOTER (1920 x 60) ------------------ */
+  .footer-bar {
+    height: 56px;
+    border: 1px solid var(--white);
+    background: var(--panel-bg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="hud-canvas">
+
+  <!-- ==================== TOP BAR (16 x 0.5 -> 60px) ==================== -->
+  <header class="top-bar">
+    <!-- Left: Workspaces -->
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div class="panel-tab" style="height: 38px; padding: 0 12px;">
+        <span class="kanji">局所領域</span>
+        <span>WORKSPACE</span>
+      </div>
+      <div class="top-workspaces">
+        <div class="ws-tab active">01</div>
+        <div class="ws-tab">02</div>
+        <div class="ws-tab">03</div>
+      </div>
+      <div style="width: 32px; height: 38px;" class="hazard-hatch"></div>
+    </div>
+
+    <!-- Center: Clock inside bracket frame -->
+    <div class="top-clock-container">
+      <div class="bracket-frame">
+        <span class="clock-kanji">標準恒星時</span>
+        <span class="clock-time">22:15:36</span>
+        <span class="type-label" style="color: var(--blue); font-weight: 800;">UTC+09</span>
+      </div>
+    </div>
+
+    <!-- Right: Network, BT, Vol, Badge, Battery, Hazard, Warning -->
+    <div class="top-status-group">
+      <!-- Network signal -->
+      <div style="display: flex; align-items: center; gap: 8px; border-right: 1px solid #333842; padding-right: 12px;">
+        <div class="signal-bars">
+          <div class="signal-bar" style="height: 4px;"></div>
+          <div class="signal-bar" style="height: 8px;"></div>
+          <div class="signal-bar" style="height: 12px;"></div>
+          <div class="signal-bar" style="height: 16px;"></div>
+        </div>
+        <div style="display: flex; flex-direction: column;">
+          <span style="font-size: 11px; font-weight: 700;">SIDONIA-LINK-5G</span>
+          <span class="type-label">WPA3-ENT // 2400 Mbps</span>
+        </div>
+      </div>
+
+      <!-- BT -->
+      <div style="display: flex; align-items: center; gap: 6px; border-right: 1px solid #333842; padding-right: 12px;">
+        <svg width="12" height="16" viewBox="0 0 12 16" fill="none" stroke="white" stroke-width="1.5">
+          <path d="M6 1V15L10 11L2 5L10 5L6 1Z"/>
+        </svg>
+        <span style="font-size: 11px; font-weight: 700;">PILOT-HELM // CONNECTED</span>
+      </div>
+
+      <!-- Volume -->
+      <div style="display: flex; align-items: center; gap: 6px; border-right: 1px solid #333842; padding-right: 12px;">
+        <span class="type-label">VOL</span>
+        <span style="font-size: 14px; font-weight: 700;">74%</span>
+      </div>
+
+      <!-- Notification badge -->
+      <div style="border: 1px solid var(--orange); padding: 2px 6px; display: flex; align-items: center; gap: 4px;">
+        <span class="type-label" style="color: var(--orange);">NOTIF</span>
+        <span style="font-size: 14px; font-weight: 800; color: var(--orange);">03</span>
+      </div>
+
+      <!-- Battery segmented -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span class="type-label">PWR</span>
+        <div class="segmented-battery">
+          <div class="batt-cell"></div>
+          <div class="batt-cell"></div>
+          <div class="batt-cell"></div>
+          <div class="batt-cell"></div>
+          <div class="batt-cell"></div>
+          <div class="batt-cell"></div>
+          <div class="batt-cell"></div>
+          <div class="batt-cell"></div>
+          <div class="batt-cell empty"></div>
+          <div class="batt-cell empty"></div>
+        </div>
+        <span style="font-size: 13px; font-weight: 700;">78% ⚡</span>
+      </div>
+
+      <!-- Hazard divider -->
+      <div style="width: 24px; height: 36px;" class="hazard-hatch"></div>
+
+      <!-- Orange warning badge -->
+      <div class="top-warning-badge">警告</div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN AREA (3 COLUMNS) ==================== -->
+  <main class="main-grid">
+
+    <!-- ==================== LEFT COLUMN (5 cells = 596px) ==================== -->
+    <div class="col-left">
+
+      <!-- 1. UPTIME TIMER (5 x 1) -->
+      <section class="panel panel-uptime">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">稼働</span>
+            <span>GAUNA CONTACT TIMER</span>
+          </div>
+          <span class="panel-sub-label">SYS_ID: GAUNA-SEC-09</span>
+        </div>
+        <div class="panel-content" style="padding-top: 4px;">
+          <div class="uptime-body">
+            <div class="type-huge text-white">14:08:22:41</div>
+            <div style="text-align: right;">
+              <div class="type-label">SINCE LAST CONTACT</div>
+              <div style="font-size: 12px; font-weight: 700; color: var(--blue);">SYSTEM STABLE</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. CPU MATRIX (5 x 3) -->
+      <section class="panel panel-cpu">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">主機演算</span>
+            <span>CPU CORE LOAD</span>
+          </div>
+          <span class="panel-sub-label">AMD RYZEN 9 7950X (16 CORES / 32 THREADS)</span>
+        </div>
+        <div class="panel-content" style="gap: 8px;">
+          <div style="display: flex; gap: 12px; height: 160px;">
+            <!-- 4x4 Heat Grid -->
+            <div>
+              <div class="type-label" style="margin-bottom: 4px;">CORE TOPOLOGY MATRIX</div>
+              <div class="heat-grid-16">
+                <!-- 16 cores with brightness mapping -->
+                <div class="heat-cell" style="background: rgba(255,255,255,0.25);">C00<br><span style="font-size:8px;">24%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.4);">C01<br><span style="font-size:8px;">45%</span></div>
+                <div class="heat-cell" style="background: var(--orange); color: #000; font-weight: 800;">C02<br><span style="font-size:8px;">89%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.15);">C03<br><span style="font-size:8px;">12%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.3);">C04<br><span style="font-size:8px;">31%</span></div>
+                <div class="heat-cell" style="background: var(--red); color: #000; font-weight: 800;">C05<br><span style="font-size:8px;">97%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.5);">C06<br><span style="font-size:8px;">54%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.2);">C07<br><span style="font-size:8px;">18%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.35);">C08<br><span style="font-size:8px;">38%</span></div>
+                <div class="heat-cell" style="background: var(--orange); color: #000; font-weight: 800;">C09<br><span style="font-size:8px;">86%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.2);">C10<br><span style="font-size:8px;">22%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.45);">C11<br><span style="font-size:8px;">49%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.1);">C12<br><span style="font-size:8px;">09%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.25);">C13<br><span style="font-size:8px;">28%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.6);">C14<br><span style="font-size:8px;">63%</span></div>
+                <div class="heat-cell" style="background: rgba(255,255,255,0.3);">C15<br><span style="font-size:8px;">35%</span></div>
+              </div>
+            </div>
+
+            <!-- Oscilloscope Waveform -->
+            <div style="flex: 1; display: flex; flex-direction: column;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span class="type-label">REALTIME OSCILLOSCOPE</span>
+                <span style="font-size: 11px; font-weight: 800; color: var(--blue);">LOAD 42.8%</span>
+              </div>
+              <div class="osc-screen">
+                <svg width="100%" height="100%" viewBox="0 0 380 135" preserveAspectRatio="none">
+                  <!-- faint center reference lines -->
+                  <line x1="0" y1="67" x2="380" y2="67" stroke="rgba(255,255,255,0.2)" stroke-dasharray="2 2" />
+                  <line x1="190" y1="0" x2="190" y2="135" stroke="rgba(255,255,255,0.2)" stroke-dasharray="2 2" />
+                  <!-- blue waveform -->
+                  <path d="M 0 90 L 20 85 L 40 92 L 60 70 L 75 40 L 90 85 L 110 95 L 130 65 L 145 25 L 160 80 L 180 90 L 205 75 L 220 30 L 235 85 L 255 60 L 270 95 L 290 85 L 310 45 L 330 90 L 350 75 L 380 82" 
+                        fill="none" stroke="#3DB8FF" stroke-width="1.8" />
+                  <!-- scan dot -->
+                  <circle cx="380" cy="82" r="3" fill="#3DB8FF" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom strip -->
+          <div style="border-top: 1px solid var(--white); padding-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 16px;">
+              <div>
+                <span class="type-label">AVG FREQ: </span>
+                <span style="font-size: 13px; font-weight: 700;">4.85 GHz</span>
+              </div>
+              <div>
+                <span class="type-label">PKG TEMP: </span>
+                <span style="font-size: 13px; font-weight: 700; color: var(--white);">58.4°C</span>
+              </div>
+              <div>
+                <span class="type-label">TDP: </span>
+                <span style="font-size: 13px; font-weight: 700;">142.6 W</span>
+              </div>
+            </div>
+            <div style="font-size: 10px; border: 1px solid var(--white); padding: 1px 4px;">GOVERNOR: PERFORMANCE</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. GPU TELEMETRY (5 x 1.5) -->
+      <section class="panel panel-gpu">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">描画演算機</span>
+            <span>GPU TELEMETRY</span>
+          </div>
+          <span class="panel-sub-label">NVIDIA GEFORCE RTX 4090 24GB</span>
+        </div>
+        <div class="panel-content">
+          <div class="arc-dials-row">
+            <!-- Arc 1: TEMP -->
+            <div class="arc-dial-box">
+              <svg width="120" height="70" viewBox="0 0 120 70">
+                <path d="M 15 65 A 45 45 0 0 1 105 65" fill="none" stroke="#2B303C" stroke-width="6" stroke-linecap="butt" />
+                <!-- 62°C of 100°C: ~62% arc -->
+                <path d="M 15 65 A 45 45 0 0 1 88 27" fill="none" stroke="var(--white)" stroke-width="6" stroke-linecap="butt" />
+                <line x1="88" y1="27" x2="93" y2="22" stroke="var(--orange)" stroke-width="2" />
+              </svg>
+              <div style="margin-top: -14px; text-align: center;">
+                <div style="font-size: 22px; font-weight: 800; line-height: 1;">62°C</div>
+                <div class="type-label">CORE TEMP</div>
+              </div>
+            </div>
+
+            <!-- Arc 2: VRAM -->
+            <div class="arc-dial-box">
+              <svg width="120" height="70" viewBox="0 0 120 70">
+                <path d="M 15 65 A 45 45 0 0 1 105 65" fill="none" stroke="#2B303C" stroke-width="6" stroke-linecap="butt" />
+                <!-- 6.4 of 24 GB: ~26% arc -->
+                <path d="M 15 65 A 45 45 0 0 1 45 25" fill="none" stroke="var(--blue)" stroke-width="6" stroke-linecap="butt" />
+              </svg>
+              <div style="margin-top: -14px; text-align: center;">
+                <div style="font-size: 22px; font-weight: 800; line-height: 1; color: var(--blue);">6.4<span style="font-size: 13px; color: var(--white);">/24G</span></div>
+                <div class="type-label">VRAM ALLOC</div>
+              </div>
+            </div>
+
+            <!-- Arc 3: POWER -->
+            <div class="arc-dial-box">
+              <svg width="120" height="70" viewBox="0 0 120 70">
+                <path d="M 15 65 A 45 45 0 0 1 105 65" fill="none" stroke="#2B303C" stroke-width="6" stroke-linecap="butt" />
+                <!-- 185 of 450 W: ~41% arc -->
+                <path d="M 15 65 A 45 45 0 0 1 65 20" fill="none" stroke="var(--white)" stroke-width="6" stroke-linecap="butt" />
+              </svg>
+              <div style="margin-top: -14px; text-align: center;">
+                <div style="font-size: 22px; font-weight: 800; line-height: 1;">185<span style="font-size: 13px; color: var(--label-gray);">/450W</span></div>
+                <div class="type-label">DRAW TGP</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. COOLING DECK (5 x 2) -->
+      <section class="panel panel-cooling">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">冷却機構</span>
+            <span>COOLING DECK & THERMAL CURVE</span>
+          </div>
+          <span class="panel-sub-label">AIO 360 + 6X CASE PWM</span>
+        </div>
+        <div class="panel-content">
+          <!-- 4 Rotating-fan glyphs -->
+          <div class="cooling-fans">
+            <div class="fan-unit">
+              <!-- Fan glyph -->
+              <svg width="28" height="28" viewBox="0 0 32 32">
+                <circle cx="16" cy="16" r="14" fill="none" stroke="white" stroke-width="1"/>
+                <circle cx="16" cy="16" r="4" fill="white"/>
+                <path d="M16 12 C18 6, 24 8, 22 13 C20 16, 16 16, 16 16" fill="white"/>
+                <path d="M20 16 C26 18, 24 24, 19 22 C16 20, 16 16, 16 16" fill="white"/>
+                <path d="M16 20 C14 26, 8 24, 10 19 C12 16, 16 16, 16 16" fill="white"/>
+                <path d="M12 16 C6 14, 8 8, 13 10 C16 12, 16 16, 16 16" fill="white"/>
+              </svg>
+              <span class="type-label" style="margin-top: 4px;">CPU PUMP</span>
+              <span style="font-size: 13px; font-weight: 700;">2,450 <span style="font-size:9px; color:var(--label-gray);">RPM</span></span>
+            </div>
+            <div class="fan-unit">
+              <svg width="28" height="28" viewBox="0 0 32 32">
+                <circle cx="16" cy="16" r="14" fill="none" stroke="white" stroke-width="1"/>
+                <circle cx="16" cy="16" r="4" fill="white"/>
+                <path d="M16 12 C18 6, 24 8, 22 13 C20 16, 16 16, 16 16" fill="white"/>
+                <path d="M20 16 C26 18, 24 24, 19 22 C16 20, 16 16, 16 16" fill="white"/>
+                <path d="M16 20 C14 26, 8 24, 10 19 C12 16, 16 16, 16 16" fill="white"/>
+                <path d="M12 16 C6 14, 8 8, 13 10 C16 12, 16 16, 16 16" fill="white"/>
+              </svg>
+              <span class="type-label" style="margin-top: 4px;">GPU FAN</span>
+              <span style="font-size: 13px; font-weight: 700;">1,380 <span style="font-size:9px; color:var(--label-gray);">RPM</span></span>
+            </div>
+            <div class="fan-unit">
+              <svg width="28" height="28" viewBox="0 0 32 32">
+                <circle cx="16" cy="16" r="14" fill="none" stroke="white" stroke-width="1"/>
+                <circle cx="16" cy="16" r="4" fill="white"/>
+                <path d="M16 12 C18 6, 24 8, 22 13 C20 16, 16 16, 16 16" fill="white"/>
+                <path d="M20 16 C26 18, 24 24, 19 22 C16 20, 16 16, 16 16" fill="white"/>
+                <path d="M16 20 C14 26, 8 24, 10 19 C12 16, 16 16, 16 16" fill="white"/>
+                <path d="M12 16 C6 14, 8 8, 13 10 C16 12, 16 16, 16 16" fill="white"/>
+              </svg>
+              <span class="type-label" style="margin-top: 4px;">INTAKE</span>
+              <span style="font-size: 13px; font-weight: 700;">1,120 <span style="font-size:9px; color:var(--label-gray);">RPM</span></span>
+            </div>
+            <div class="fan-unit">
+              <svg width="28" height="28" viewBox="0 0 32 32">
+                <circle cx="16" cy="16" r="14" fill="none" stroke="white" stroke-width="1"/>
+                <circle cx="16" cy="16" r="4" fill="white"/>
+                <path d="M16 12 C18 6, 24 8, 22 13 C20 16, 16 16, 16 16" fill="white"/>
+                <path d="M20 16 C26 18, 24 24, 19 22 C16 20, 16 16, 16 16" fill="white"/>
+                <path d="M16 20 C14 26, 8 24, 10 19 C12 16, 16 16, 16 16" fill="white"/>
+                <path d="M12 16 C6 14, 8 8, 13 10 C16 12, 16 16, 16 16" fill="white"/>
+              </svg>
+              <span class="type-label" style="margin-top: 4px;">EXHAUST</span>
+              <span style="font-size: 13px; font-weight: 700;">1,200 <span style="font-size:9px; color:var(--label-gray);">RPM</span></span>
+            </div>
+          </div>
+
+          <!-- Fan curve chart with single glowing orange dot -->
+          <div style="flex: 1; border: 1px solid #2B303C; position: relative; padding: 4px; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--label-gray); margin-bottom: 2px;">
+              <span>CURVE [TEMP -> RPM]</span>
+              <span>SETPOINT: 58.4°C @ 1,380 RPM</span>
+            </div>
+            <div style="flex: 1; position: relative;">
+              <svg width="100%" height="100%" viewBox="0 0 550 56" preserveAspectRatio="none">
+                <line x1="0" y1="55" x2="550" y2="55" stroke="#444" stroke-width="1" />
+                <line x1="0" y1="0" x2="0" y2="55" stroke="#444" stroke-width="1" />
+                <!-- Fan curve polyline -->
+                <path d="M 0 50 L 150 48 L 280 38 L 380 20 L 480 8 L 550 5" fill="none" stroke="white" stroke-width="1.5" />
+                <!-- Current operating point at 58.4°C (~320px, 32px) -->
+                <circle cx="320" cy="32" r="4" fill="var(--orange)" />
+                <line x1="320" y1="0" x2="320" y2="55" stroke="var(--orange)" stroke-width="1" stroke-dasharray="2 2" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. MEMORY + DISKS (5 x 1.5) -->
+      <section class="panel panel-storage">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">主記憶容量</span>
+            <span>MEMORY & DISK VOLUMES</span>
+          </div>
+          <span class="panel-sub-label">DDR5 32GB 6000MHz // 2TB NVME</span>
+        </div>
+        <div class="panel-content">
+          <div class="v-bars-row">
+            <!-- RAM 46% -->
+            <div class="v-bar-group">
+              <span style="font-size: 12px; font-weight: 800;">46%</span>
+              <div class="v-bar-slot">
+                <div class="v-bar-fill" style="height: 46%;"></div>
+              </div>
+              <span class="type-label">RAM</span>
+              <span style="font-size: 9px; color: var(--label-gray);">14.7G</span>
+            </div>
+
+            <!-- SWAP 15% -->
+            <div class="v-bar-group">
+              <span style="font-size: 12px; font-weight: 800;">15%</span>
+              <div class="v-bar-slot">
+                <div class="v-bar-fill" style="height: 15%;"></div>
+              </div>
+              <span class="type-label">SWAP</span>
+              <span style="font-size: 9px; color: var(--label-gray);">4.8G</span>
+            </div>
+
+            <!-- ROOT 41% -->
+            <div class="v-bar-group">
+              <span style="font-size: 12px; font-weight: 800;">41%</span>
+              <div class="v-bar-slot">
+                <div class="v-bar-fill" style="height: 41%;"></div>
+              </div>
+              <span class="type-label">ROOT</span>
+              <span style="font-size: 9px; color: var(--label-gray);">410G</span>
+            </div>
+
+            <!-- HOME 60% -->
+            <div class="v-bar-group">
+              <span style="font-size: 12px; font-weight: 800;">60%</span>
+              <div class="v-bar-slot">
+                <div class="v-bar-fill" style="height: 60%;"></div>
+              </div>
+              <span class="type-label">HOME</span>
+              <span style="font-size: 9px; color: var(--label-gray);">1.2T</span>
+            </div>
+
+            <!-- NVME R/W 72% -->
+            <div class="v-bar-group">
+              <span style="font-size: 12px; font-weight: 800; color: var(--blue);">72%</span>
+              <div class="v-bar-slot">
+                <div class="v-bar-fill" style="height: 72%; background: var(--blue);"></div>
+              </div>
+              <span class="type-label" style="color: var(--blue);">NVME</span>
+              <span style="font-size: 9px; color: var(--label-gray);">5.2GB/s</span>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px;">
+            <span>TOTAL ALLOC: 32.0 GB DDR5</span>
+            <span style="color: var(--blue);">IOPS: 420K R / 380K W</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ==================== CENTER COLUMN (6 cells = 712px) ==================== -->
+    <div class="col-center">
+
+      <!-- 1. ALERT HEADER (6 x 0.5) -->
+      <section class="panel-alert-banner">
+        <div class="alert-text-kanji">
+          <span>注意</span>
+          <span>ガ20 接近中</span>
+          <span style="font-size: 13px; font-weight: 800; background: #000; color: #fff; padding: 2px 6px;">
+            GAUNA-020 INTERCEPT
+          </span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 13px; font-weight: 900; font-family: var(--font-jp);">出撃衛人 三十六機</span>
+          <div style="width: 80px; height: 38px;" class="hazard-hatch"></div>
+        </div>
+      </section>
+
+      <!-- 2. RADAR RING (6 x 3) = FOCAL POINT -->
+      <section class="panel panel-radar">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">索敵網</span>
+            <span>GAUNA TARGETING RADAR & HIGGS VECTOR</span>
+          </div>
+          <span class="panel-sub-label">TRACKING ID: GA-020-KABIZASHI</span>
+        </div>
+        <div class="panel-content" style="padding: 0;">
+          <div class="radar-canvas-wrap">
+            <!-- Coordinates in 4 corners -->
+            <div class="radar-hud-coords tl">
+              <div>GRID: [16x10]-C03</div>
+              <div>RNG: 45,960 m</div>
+            </div>
+            <div class="radar-hud-coords tr">
+              <div>ELV: +12.8°</div>
+              <div>AZM: 284.14°</div>
+            </div>
+            <div class="radar-hud-coords bl">
+              <div>HIGGS: 840 TBq</div>
+              <div>MASS: 4.2e6 T</div>
+            </div>
+            <div class="radar-hud-coords br">
+              <div>STATUS: APPROACHING</div>
+              <div>LOCK: HARD CONTACT</div>
+            </div>
+
+            <!-- Complex Sidonia Radar SVG -->
+            <svg width="440" height="300" viewBox="0 0 440 300">
+              <!-- Coordinate Dashed Crosshair -->
+              <line x1="20" y1="150" x2="420" y2="150" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-dasharray="4 4" />
+              <line x1="220" y1="10" x2="220" y2="290" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-dasharray="4 4" />
+
+              <!-- Outer segmented white circle (R=125) -->
+              <circle cx="220" cy="150" r="125" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3 3" />
+              <circle cx="220" cy="150" r="115" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="14 4" />
+
+              <!-- Outer Blue Arc Indicator (live scan) -->
+              <path d="M 220 35 A 115 115 0 0 1 332 120" fill="none" stroke="var(--blue)" stroke-width="4" stroke-linecap="butt" />
+
+              <!-- Secondary concentric rings -->
+              <circle cx="220" cy="150" r="85" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1" />
+              <circle cx="220" cy="150" r="55" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1" stroke-dasharray="2 4" />
+
+              <!-- Range ticks (Compass markings) -->
+              <line x1="220" y1="23" x2="220" y2="35" stroke="white" stroke-width="2" />
+              <line x1="220" y1="265" x2="220" y2="277" stroke="white" stroke-width="2" />
+              <line x1="93" y1="150" x2="105" y2="150" stroke="white" stroke-width="2" />
+              <line x1="335" y1="150" x2="347" y2="150" stroke="white" stroke-width="2" />
+
+              <!-- ONE Orange Focal Marker on the Ring (The Gauna entity) -->
+              <circle cx="318" cy="98" r="5.5" fill="var(--orange)" />
+              <circle cx="318" cy="98" r="12" fill="none" stroke="var(--orange)" stroke-width="1.2" stroke-dasharray="2 2" />
+              <line x1="324" y1="92" x2="360" y2="70" stroke="var(--orange)" stroke-width="1" />
+              <text x="365" y="73" fill="var(--orange)" font-size="10" font-family="'JetBrains Mono'" font-weight="800">TGT_01 [GA20]</text>
+
+              <!-- Center Box with HUGE 96 Numeral & Kanji -->
+              <rect x="180" y="112" width="80" height="76" fill="#000000" stroke="white" stroke-width="1.5" />
+              <text x="220" y="158" fill="white" font-size="52" font-weight="900" font-family="'JetBrains Mono'" text-anchor="middle">96</text>
+              <rect x="188" y="166" width="64" height="16" fill="white" />
+              <text x="220" y="178" fill="#000" font-size="11" font-weight="900" font-family="'Noto Sans JP'" text-anchor="middle">目標補足</text>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. TARGET TILES (6 x 0.5) -->
+      <section class="panel-target-tiles">
+        <div class="target-tile">
+          <span class="type-label">TARGET</span>
+          <span style="font-size: 14px; font-weight: 800; color: var(--orange);">GAUNA #020</span>
+        </div>
+        <div class="target-tile">
+          <span class="type-label">VELOCITY</span>
+          <span style="font-size: 14px; font-weight: 800;">MACH 14.8</span>
+        </div>
+        <div class="target-tile">
+          <span class="type-label">HIGGS PWR</span>
+          <span style="font-size: 14px; font-weight: 800; color: var(--blue);">98.4% CAP</span>
+        </div>
+        <div class="target-tile">
+          <span class="type-label">LOCK STATE</span>
+          <span style="font-size: 14px; font-weight: 800; color: var(--red);">HARD ACQUIRE</span>
+        </div>
+      </section>
+
+      <!-- 4. NET TELEMETRY (6 x 1.5) -->
+      <section class="panel panel-network">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">通信網</span>
+            <span>NETWORK TOPOLOGY & TRAFFIC</span>
+          </div>
+          <span class="panel-sub-label">GATEWAY: 10.0.0.1 // DNS: 1.1.1.1</span>
+        </div>
+        <div class="panel-content" style="flex-direction: row; gap: 12px; align-items: center;">
+          <!-- Node graph with thin blue lines -->
+          <div style="width: 310px; height: 120px; border: 1px solid #2B303C; position: relative;">
+            <svg width="100%" height="100%" viewBox="0 0 310 120">
+              <!-- Thin blue topology links -->
+              <line x1="40" y1="60" x2="130" y2="35" stroke="var(--blue)" stroke-width="1.2" />
+              <line x1="40" y1="60" x2="130" y2="85" stroke="var(--blue)" stroke-width="1.2" />
+              <line x1="130" y1="35" x2="230" y2="25" stroke="var(--blue)" stroke-width="1.2" />
+              <line x1="130" y1="35" x2="230" y2="55" stroke="var(--blue)" stroke-width="1.2" stroke-dasharray="3 2" />
+              <line x1="130" y1="85" x2="230" y2="95" stroke="var(--blue)" stroke-width="1.2" />
+              
+              <!-- Node dots and labels -->
+              <!-- Local Host -->
+              <rect x="25" y="48" width="30" height="24" fill="#000" stroke="white" stroke-width="1" />
+              <text x="40" y="64" fill="white" font-size="9" text-anchor="middle" font-weight="700">HOST</text>
+              
+              <!-- Gateway -->
+              <rect x="115" y="23" width="30" height="24" fill="#000" stroke="var(--blue)" stroke-width="1" />
+              <text x="130" y="39" fill="var(--blue)" font-size="8" text-anchor="middle" font-weight="700">GW_01</text>
+
+              <rect x="115" y="73" width="30" height="24" fill="#000" stroke="white" stroke-width="1" />
+              <text x="130" y="89" fill="white" font-size="8" text-anchor="middle" font-weight="700">DNS_P</text>
+
+              <!-- Remote nodes -->
+              <circle cx="230" cy="25" r="4" fill="white" />
+              <text x="240" y="28" fill="var(--label-gray)" font-size="8">WAN-AS13335</text>
+
+              <circle cx="230" cy="55" r="4" fill="var(--orange)" />
+              <text x="240" y="58" fill="var(--orange)" font-size="8">RELAY-04 (ALERT)</text>
+
+              <circle cx="230" cy="95" r="4" fill="white" />
+              <text x="240" y="98" fill="var(--label-gray)" font-size="8">WG-MESH-01</text>
+            </svg>
+          </div>
+
+          <!-- Numbers & Sparkline -->
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; height: 120px;">
+            <div style="display: flex; justify-content: space-between;">
+              <div>
+                <span class="type-label">LATENCY PING: </span>
+                <span style="font-size: 18px; font-weight: 800; color: var(--blue);">14 ms</span>
+              </div>
+              <div>
+                <span class="type-label">PACKET LOSS: </span>
+                <span style="font-size: 13px; font-weight: 700;">0.00%</span>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid #2B303C; padding-top: 4px;">
+              <div>
+                <span class="type-label">RX SPEED:</span>
+                <div style="font-size: 15px; font-weight: 800;">48.2 MB/s</div>
+              </div>
+              <div style="text-align: right;">
+                <span class="type-label">TX SPEED:</span>
+                <div style="font-size: 15px; font-weight: 800; color: var(--blue);">12.6 MB/s</div>
+              </div>
+            </div>
+
+            <!-- Tiny sparkline -->
+            <div style="height: 28px; border: 1px solid #2B303C; background: #050608;">
+              <svg width="100%" height="100%" viewBox="0 0 320 28" preserveAspectRatio="none">
+                <path d="M 0 24 L 20 20 L 40 22 L 60 14 L 80 18 L 100 8 L 120 12 L 140 5 L 160 16 L 180 10 L 200 4 L 220 18 L 240 12 L 260 22 L 280 14 L 300 18 L 320 6" 
+                      fill="none" stroke="#3DB8FF" stroke-width="1.5" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. SYSTEM + CHASSIS (6 x 3.5) -->
+      <section class="panel panel-chassis">
+        <!-- Left: Line drawing of mecha/humanoid frame on hazard block with callouts -->
+        <div class="chassis-half-left">
+          <div class="panel-header" style="border-bottom: 1px solid var(--white);">
+            <div class="panel-tab">
+              <span class="kanji">機体構造</span>
+              <span>TSUGUMORI FRAME</span>
+            </div>
+            <span class="panel-sub-label">TYPE-17</span>
+          </div>
+
+          <div style="flex: 1; position: relative; background: #000; overflow: hidden;">
+            <!-- Hazard-hatch background strip behind the frame -->
+            <div style="position: absolute; left: 80px; top: 0; width: 150px; height: 100%; opacity: 0.15;" class="hazard-hatch"></div>
+
+            <!-- Pure white hairline mecha drawing -->
+            <svg width="320" height="370" viewBox="0 0 320 370" style="position: absolute; top: 0; left: 0;">
+              <!-- Head / Visor -->
+              <polygon points="160,20 172,38 168,52 152,52 148,38" fill="none" stroke="white" stroke-width="1.4" />
+              <line x1="154" y1="36" x2="166" y2="36" stroke="var(--blue)" stroke-width="2" />
+
+              <!-- Neck & Torso -->
+              <rect x="156" y="52" width="8" height="12" fill="none" stroke="white" stroke-width="1" />
+              <polygon points="140,64 180,64 195,115 170,165 150,165 125,115" fill="none" stroke="white" stroke-width="1.5" />
+              <line x1="160" y1="64" x2="160" y2="165" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-dasharray="2 2" />
+
+              <!-- Shoulder plates -->
+              <polygon points="138,68 115,75 105,100 128,105 138,85" fill="none" stroke="white" stroke-width="1.2" />
+              <polygon points="182,68 205,75 215,100 192,105 182,85" fill="none" stroke="white" stroke-width="1.2" />
+
+              <!-- Arms -->
+              <line x1="112" y1="102" x2="98" y2="155" stroke="white" stroke-width="1.2" />
+              <line x1="98" y1="155" x2="85" y2="205" stroke="white" stroke-width="1.2" />
+              <!-- Hand -->
+              <rect x="80" y="205" width="10" height="15" fill="none" stroke="white" stroke-width="1" />
+
+              <line x1="208" y1="102" x2="222" y2="155" stroke="white" stroke-width="1.2" />
+              <line x1="222" y1="155" x2="235" y2="205" stroke="white" stroke-width="1.2" />
+              <rect x="230" y="205" width="10" height="15" fill="none" stroke="white" stroke-width="1" />
+
+              <!-- Waist & Pelvis -->
+              <polygon points="145,165 175,165 182,190 138,190" fill="none" stroke="white" stroke-width="1.4" />
+
+              <!-- Legs -->
+              <line x1="148" y1="190" x2="140" y2="260" stroke="white" stroke-width="1.4" />
+              <line x1="140" y1="260" x2="135" y2="330" stroke="white" stroke-width="1.4" />
+              <!-- Left Foot -->
+              <polygon points="135,330 115,348 140,348" fill="none" stroke="white" stroke-width="1.2" />
+
+              <line x1="172" y1="190" x2="180" y2="260" stroke="white" stroke-width="1.4" />
+              <line x1="180" y1="260" x2="185" y2="330" stroke="white" stroke-width="1.4" />
+              <!-- Right Foot -->
+              <polygon points="185,330 205,348 180,348" fill="none" stroke="white" stroke-width="1.2" />
+
+              <!-- Callout lines and tags -->
+              <!-- Visor / Sensor callout -->
+              <line x1="172" y1="38" x2="245" y2="25" stroke="white" stroke-width="1" />
+              <line x1="245" y1="25" x2="270" y2="25" stroke="white" stroke-width="1" />
+              <text x="245" y="18" fill="var(--label-gray)" font-size="8">HEAD_OPTICS // OK</text>
+
+              <!-- Main Higgs Reactor Core callout -->
+              <circle cx="160" cy="115" r="5" fill="var(--orange)" />
+              <line x1="160" y1="115" x2="60" y2="120" stroke="var(--orange)" stroke-width="1" />
+              <line x1="60" y1="120" x2="20" y2="120" stroke="var(--orange)" stroke-width="1" />
+              <text x="20" y="112" fill="var(--orange)" font-size="8" font-weight="700">HIGGS CORE [450MW]</text>
+
+              <!-- Kabizashi Mount callout -->
+              <line x1="88" y1="210" x2="35" y2="240" stroke="white" stroke-width="1" />
+              <line x1="35" y1="240" x2="10" y2="240" stroke="white" stroke-width="1" />
+              <text x="10" y="234" fill="var(--label-gray)" font-size="8">KABIZASHI SPEAR</text>
+
+              <!-- Attitude Thrusters callout -->
+              <line x1="185" y1="260" x2="250" y2="280" stroke="white" stroke-width="1" />
+              <line x1="250" y1="280" x2="285" y2="280" stroke="white" stroke-width="1" />
+              <text x="250" y="274" fill="var(--label-gray)" font-size="8">RCS THRUSTERS</text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Right: fastfetch-style specs + Arch Linux ASCII -->
+        <div class="chassis-half-right">
+          <div class="panel-header" style="margin: -10px -10px 8px -10px; border-bottom: 1px solid var(--white);">
+            <div class="panel-tab">
+              <span class="kanji">計算基底</span>
+              <span>HOST ARCHITECTURE (FASTFETCH)</span>
+            </div>
+            <span class="panel-sub-label">KERNEL 6.9.7-ARCH1-1</span>
+          </div>
+
+          <!-- Arch ASCII + Spec Table -->
+          <div style="display: flex; gap: 14px; flex: 1;">
+            <!-- Blue Arch ASCII Art -->
+            <pre style="color: var(--blue); font-size: 11px; line-height: 12px; font-weight: 700; margin: 0; padding: 4px;">
+      /\
+     /  \
+    /\   \
+   /      \
+  /   ,,   \
+ /   |  |  -\
+/_-''    ''-_\
+            </pre>
+
+            <!-- fastfetch metadata -->
+            <div style="flex: 1; font-size: 12px; line-height: 1.6; display: flex; flex-direction: column; justify-content: center;">
+              <div><span class="type-label">OS: </span><span style="font-weight: 700;">ARCH LINUX x86_64</span></div>
+              <div><span class="type-label">HOST: </span><span style="font-weight: 700;">TSUGUMORI-MK17 [DESKTOP]</span></div>
+              <div><span class="type-label">KERNEL: </span><span style="font-weight: 700;">6.9.7-arch1-1-zen</span></div>
+              <div><span class="type-label">UPTIME: </span><span style="font-weight: 700;">14d 8h 22m 41s</span></div>
+              <div><span class="type-label">WM: </span><span style="font-weight: 700; color: var(--blue);">Hyprland (wayland)</span></div>
+              <div><span class="type-label">TERM: </span><span style="font-weight: 700;">alacritty</span></div>
+              <div><span class="type-label">SHELL: </span><span style="font-weight: 700;">zsh 5.9</span></div>
+              <div><span class="type-label">CPU: </span><span style="font-weight: 700;">AMD Ryzen 9 7950X (32) @ 4.85GHz</span></div>
+              <div><span class="type-label">GPU: </span><span style="font-weight: 700;">NVIDIA GeForce RTX 4090 [24GB]</span></div>
+              <div><span class="type-label">MEM: </span><span style="font-weight: 700;">14.7 GiB / 31.2 GiB (46%)</span></div>
+              <div><span class="type-label">SWAP: </span><span style="font-weight: 700;">4.8 GiB / 32.0 GiB (15%)</span></div>
+            </div>
+          </div>
+
+          <!-- Bottom Hazard Accent Block inside Right Half -->
+          <div style="height: 24px; border: 1px solid var(--white); display: flex; align-items: center; justify-content: space-between; padding: 0 8px; margin-top: 6px;">
+            <span style="font-size: 10px; font-weight: 800;">SYS_COMPLIANCE: 100% SPEC</span>
+            <div style="width: 120px; height: 14px;" class="hazard-hatch"></div>
+            <span style="font-size: 10px; color: var(--green); font-weight: 800;">SECURE_BOOT: ENABLED</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ==================== RIGHT COLUMN (5 cells = 596px) ==================== -->
+    <div class="col-right">
+
+      <!-- 1. MEDIA DECK (5 x 1.5) -->
+      <section class="panel panel-media">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">音響装置</span>
+            <span>MPRIS MEDIA DECK</span>
+          </div>
+          <span class="panel-sub-label">PLAYER: SPOTIFY (D-BUS)</span>
+        </div>
+        <div class="panel-content">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div>
+              <div style="font-size: 15px; font-weight: 800; color: var(--white);">KNIGHTS OF SIDONIA (OST)</div>
+              <div class="type-label" style="color: var(--blue);">ANGELA // SIDONIA NO KISHI</div>
+            </div>
+            <div style="font-size: 11px; font-weight: 700;">02:44 / 04:18</div>
+          </div>
+
+          <!-- Blue audio-visualizer bars -->
+          <div class="media-vis-bars">
+            <div style="width: 8px; height: 40%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 75%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 95%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 60%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 85%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 40%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 100%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 70%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 50%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 80%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 30%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 90%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 65%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 45%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 85%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 20%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 60%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 90%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 40%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 70%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 80%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 55%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 35%; background: var(--blue);"></div>
+            <div style="width: 8px; height: 15%; background: var(--blue);"></div>
+          </div>
+
+          <!-- Progress bar -->
+          <div style="width: 100%; height: 4px; background: #2B303C; margin-bottom: 8px; position: relative;">
+            <div style="width: 63%; height: 100%; background: var(--white);"></div>
+          </div>
+
+          <!-- Controls: PREV / PAUSE / NEXT -->
+          <div class="media-btn-row">
+            <button class="fui-button">|&lt; PREV</button>
+            <button class="fui-button active">|| PAUSE</button>
+            <button class="fui-button">NEXT &gt;|</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. CONTROL PANEL (5 x 2.5) -->
+      <section class="panel panel-controls">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">制御卓</span>
+            <span>SYSTEM CONTROL & MODES</span>
+          </div>
+          <span class="panel-sub-label">INPUT INTERFACES</span>
+        </div>
+        <div class="panel-content">
+          <!-- Segmented Sliders -->
+          <!-- BRIGHTNESS 80% (16/20 filled) -->
+          <div class="segmented-slider-row">
+            <div style="display: flex; justify-content: space-between;">
+              <span class="type-label">DISP BRIGHTNESS</span>
+              <span style="font-size: 11px; font-weight: 700;">80%</span>
+            </div>
+            <div class="slider-track-segments">
+              <div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div>
+              <div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div>
+              <div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div>
+              <div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div>
+              <div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div>
+            </div>
+          </div>
+
+          <!-- VOLUME 74% (15/20 filled) -->
+          <div class="segmented-slider-row">
+            <div style="display: flex; justify-content: space-between;">
+              <span class="type-label">MASTER VOLUME</span>
+              <span style="font-size: 11px; font-weight: 700;">74%</span>
+            </div>
+            <div class="slider-track-segments">
+              <div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div>
+              <div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div>
+              <div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div>
+              <div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div>
+              <div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div>
+            </div>
+          </div>
+
+          <!-- MIC 40% (8/20 filled) -->
+          <div class="segmented-slider-row">
+            <div style="display: flex; justify-content: space-between;">
+              <span class="type-label">MIC INPUT GAIN</span>
+              <span style="font-size: 11px; font-weight: 700;">40%</span>
+            </div>
+            <div class="slider-track-segments">
+              <div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div>
+              <div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div><div class="slider-seg filled"></div>
+              <div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div>
+              <div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div>
+              <div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div><div class="slider-seg"></div>
+            </div>
+          </div>
+
+          <!-- Row of six toggle buttons -->
+          <div class="toggle-grid-6">
+            <div class="fui-toggle on">NIGHT LIGHT [ON]</div>
+            <div class="fui-toggle">DND [OFF]</div>
+            <div class="fui-toggle">AIRPLANE [OFF]</div>
+            <div class="fui-toggle on">SCREEN REC [ON]</div>
+            <div class="fui-toggle on">IDLE INHIBIT [ON]</div>
+            <div class="fui-toggle on">VPN [ACTIVE]</div>
+          </div>
+
+          <!-- Power profile selector: 3 segments 省電 / 均衡 / 全力 (last one filled orange) -->
+          <div style="margin-top: 8px;">
+            <span class="type-label">POWER PROFILE GOVERNOR</span>
+            <div class="power-profile-strip">
+              <div class="power-seg">省電<br><span style="font-size:9px;">ECO</span></div>
+              <div class="power-seg">均衡<br><span style="font-size:9px;">BALANCED</span></div>
+              <div class="power-seg orange-active">全力<br><span style="font-size:9px;">MAX PERFORMANCE</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. QUICK STATUS TILES (5 x 1) -->
+      <section class="panel-quick-status">
+        <div class="quick-tile">
+          <span class="type-label">WI-FI</span>
+          <span style="font-size: 13px; font-weight: 800; color: var(--blue);">CONNECTED</span>
+        </div>
+        <div class="quick-tile">
+          <span class="type-label">BLUETOOTH</span>
+          <span style="font-size: 13px; font-weight: 800;">1 DEVICE</span>
+        </div>
+        <div class="quick-tile">
+          <span class="type-label">WIREGUARD</span>
+          <span style="font-size: 13px; font-weight: 800; color: var(--blue);">TUN0 UP</span>
+        </div>
+        <div class="quick-tile">
+          <span class="type-label">GAMMA</span>
+          <span style="font-size: 13px; font-weight: 800;">4500 K</span>
+        </div>
+      </section>
+
+      <!-- 4. WORKSPACE MAP (5 x 1) -->
+      <section class="panel panel-ws-map">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">仮想画面</span>
+            <span>HYPRLAND WORKSPACE MAP</span>
+          </div>
+          <span class="panel-sub-label">ACTIVE: DISP-1 [01]</span>
+        </div>
+        <div class="panel-content">
+          <div class="ws-map-container">
+            <!-- 01 (Active, blue outlined) -->
+            <div class="ws-mini-screen active">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="font-size: 10px; font-weight: 800; color: var(--blue);">01: MAIN</span>
+                <span style="font-size: 9px; color: var(--blue);">4 WINS</span>
+              </div>
+              <div style="flex: 1; position: relative; margin-top: 4px;">
+                <div class="mini-window active" style="top: 2px; left: 2px; width: 45%; height: 80%;"></div>
+                <div class="mini-window" style="top: 2px; right: 2px; width: 45%; height: 38%;"></div>
+                <div class="mini-window" style="bottom: 2px; right: 2px; width: 45%; height: 38%;"></div>
+              </div>
+            </div>
+
+            <!-- 02 -->
+            <div class="ws-mini-screen">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="font-size: 10px; font-weight: 800; color: var(--label-gray);">02: DEV</span>
+                <span style="font-size: 9px; color: var(--label-gray);">2 WINS</span>
+              </div>
+              <div style="flex: 1; position: relative; margin-top: 4px;">
+                <div class="mini-window" style="top: 2px; left: 2px; width: 48%; height: 85%;"></div>
+                <div class="mini-window" style="top: 2px; right: 2px; width: 45%; height: 85%;"></div>
+              </div>
+            </div>
+
+            <!-- 03 -->
+            <div class="ws-mini-screen">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="font-size: 10px; font-weight: 800; color: var(--label-gray);">03: COMMS</span>
+                <span style="font-size: 9px; color: var(--label-gray);">1 WIN</span>
+              </div>
+              <div style="flex: 1; position: relative; margin-top: 4px;">
+                <div class="mini-window" style="top: 2px; left: 10px; width: 80%; height: 85%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. NOTIFICATION FEED (5 x 3) -->
+      <section class="panel panel-notifications">
+        <div class="panel-header">
+          <div class="panel-tab">
+            <span class="kanji">伝達記録</span>
+            <span>SYSTEM LOGS & NOTIFICATIONS</span>
+          </div>
+          <span class="panel-sub-label">JOURNALCTL -F // 5 ENTRIES</span>
+        </div>
+        <div class="panel-content">
+          <!-- Row 1: Red Outline (Alert) -->
+          <div class="noti-row border-red">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="font-size: 11px; font-weight: 800; color: var(--red);">[GAUNA_DETECT] KABIZASHI-01</span>
+              <span class="type-label">00:01m AGO</span>
+            </div>
+            <div style="font-size: 12px; font-weight: 600;">High Higgs mass anomaly detected at Azimuth 284°. Intercept protocol 7 enacted.</div>
+          </div>
+
+          <!-- Row 2: Orange Outline (Warning) -->
+          <div class="noti-row border-orange">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="font-size: 11px; font-weight: 800; color: var(--orange);">[THERMAL_WARN] CPU-CORE-05</span>
+              <span class="type-label">00:04m AGO</span>
+            </div>
+            <div style="font-size: 12px; font-weight: 600;">Core #05 load sustained at 97% (58.4°C pkg). Fan profile automatically raised.</div>
+          </div>
+
+          <!-- Row 3: Normal -->
+          <div class="noti-row">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="font-size: 11px; font-weight: 800; color: var(--blue);">[HYPRLAND_IPC] DISPATCH</span>
+              <span class="type-label">00:12m AGO</span>
+            </div>
+            <div style="font-size: 12px; font-weight: 400; color: var(--dim-white);">Workspace 01 tiled layout updated: window [Alacritty:fastfetch] mapped.</div>
+          </div>
+
+          <!-- Row 4: Normal -->
+          <div class="noti-row">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="font-size: 11px; font-weight: 800; color: var(--white);">[SYSTEMD] WIREGUARD</span>
+              <span class="type-label">00:35m AGO</span>
+            </div>
+            <div style="font-size: 12px; font-weight: 400; color: var(--dim-white);">Peer endpoint handshake completed successfully on wg0. MTU=1420.</div>
+          </div>
+
+          <!-- Row 5: Normal -->
+          <div class="noti-row">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="font-size: 11px; font-weight: 800; color: var(--white);">[PACMAN] DATABASE SYNC</span>
+              <span class="type-label">01:14h AGO</span>
+            </div>
+            <div style="font-size: 12px; font-weight: 400; color: var(--dim-white);">Repositories core, extra, multilib synchronized. 0 packages to upgrade.</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- ==================== FOOTER (16 x 0.5 -> 60px) ==================== -->
+  <footer class="footer-bar">
+    <!-- Left: Branding & Grid Spec -->
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div class="panel-tab" style="height: 38px; padding: 0 12px;">
+        <span class="kanji">重力子放射線</span>
+        <span>mecha-FUI</span>
+      </div>
+      <span style="font-size: 13px; font-weight: 800; letter-spacing: 1px;">
+        // GRID SYSTEM 120px [16x10]
+      </span>
+      <span class="type-label">BUILD: HYPR-2024-GAUNA-V4</span>
+    </div>
+
+    <!-- Center: Hazard stripe band -->
+    <div style="width: 480px; height: 28px; border: 1px solid var(--white);" class="hazard-hatch"></div>
+
+    <!-- Right: Resolution & Green OK tag -->
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <span style="font-size: 12px; font-weight: 700;">DISPLAY: 1920x1200 @ 144Hz DP-1</span>
+      <div style="border: 1px solid var(--green); padding: 3px 8px; display: flex; align-items: center; gap: 6px;">
+        <span style="display: inline-block; width: 6px; height: 6px; background: var(--green);"></span>
+        <span style="font-size: 11px; font-weight: 800; color: var(--green); letter-spacing: 1px;">
+          ALL SYSTEMS GREEN
+        </span>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+</body>
+</html>
